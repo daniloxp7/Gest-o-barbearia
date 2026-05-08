@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-labelledby="title">
+  <title id="title">Cabelo e barba</title>
+  <rect width="160" height="120" rx="14" fill="#111514"/>
+  <path d="M18 92h124" stroke="#fffaf0" stroke-opacity=".18" stroke-width="5" stroke-linecap="round"/>
+  <rect x="55" y="34" width="50" height="54" rx="14" fill="#f7f4ee"/>
+  <path d="M54 55c15 7 29 7 43 0 5-3 10-4 15-2v11c0 22-14 39-32 39S48 86 48 64z" fill="#151817"/>
+  <path d="M47 34c9-21 24-30 45-27 17 2 30 12 39 29-17-5-32-4-43 1-13 6-27 5-41-3z" fill="#8f6425"/>
+  <path d="M118 24l24 66" stroke="#d9b568" stroke-width="6" stroke-linecap="round"/>
+  <path d="M130 34l-19 8 19 52 19-8z" fill="#dfe6e3"/>
+  <path d="M18 26l28 28M46 26L18 54" stroke="#d9b568" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="15" cy="23" r="8" fill="#fffaf0"/>
+  <circle cx="49" cy="23" r="8" fill="#fffaf0"/>
+</svg>

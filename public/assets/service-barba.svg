@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-labelledby="title">
+  <title id="title">Barba</title>
+  <rect width="160" height="120" rx="14" fill="#23312d"/>
+  <circle cx="42" cy="92" r="36" fill="#7b3037" opacity=".16"/>
+  <path d="M64 20h38c13 0 23 10 23 23v19c0 28-21 50-42 50S41 90 41 62V43c0-13 10-23 23-23z" fill="#f7f4ee"/>
+  <path d="M40 56c18 9 34 9 48 1 9-5 22-4 38 3v8c0 28-21 50-42 50S41 96 41 68z" fill="#151817"/>
+  <path d="M64 76c7 8 14 12 21 12s14-4 21-12" stroke="#fffaf0" stroke-width="6" stroke-linecap="round"/>
+  <path d="M43 26c14-20 36-27 66-20 14 4 25 12 32 23-18-6-34-6-47 0-17 7-34 6-51-3z" fill="#8f6425"/>
+  <path d="M124 26l22 64" stroke="#d9b568" stroke-width="6" stroke-linecap="round"/>
+  <path d="M136 36l-18 8 19 52 18-8z" fill="#dfe6e3"/>
+</svg>

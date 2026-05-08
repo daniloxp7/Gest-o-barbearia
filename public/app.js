@@ -19,6 +19,21 @@ const state = {
 
 const $ = (selector) => document.querySelector(selector);
 
+const escapeHtml = (value = '') => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+const safeAttr = escapeHtml;
+const money = (value) => `R$ ${Number(value || 0).toFixed(2)}`;
+const formatStatus = (status) => ({
+  Agendado: 'Agendado',
+  Concluido: 'Concluido',
+  Cancelado: 'Cancelado'
+}[status] || status);
+
 const headers = {
   dashboard: 'Dashboard',
   clients: 'Clientes',
@@ -154,7 +169,9 @@ const renderDashboard = (container) => {
   const completed = state.appointments.filter((item) => item.status === 'Concluido').length;
   const scheduled = state.appointments.filter((item) => item.status === 'Agendado').length;
   const canceled = state.appointments.filter((item) => item.status === 'Cancelado').length;
-  const revenue = state.appointments.reduce((total, item) => total + Number(item.servicePrice || 0), 0);
+  const revenue = state.appointments
+    .filter((item) => item.status === 'Concluido')
+    .reduce((total, item) => total + Number(item.servicePrice || 0), 0);
 
   container.innerHTML = `
     <div class="dashboard-grid">
@@ -183,7 +200,7 @@ const renderDashboard = (container) => {
       </div>
       <div class="metric-card" style="margin-top: 20px;">
         <h4>Faturamento total</h4>
-        <p>R$ ${revenue.toFixed(2)}</p>
+        <p>${money(revenue)}</p>
       </div>
     </div>
   `;
@@ -193,14 +210,34 @@ const renderLogin = (container) => {
   document.querySelector('header nav').style.display = 'none';
   $('#logout').hidden = true;
   container.innerHTML = `
-    <div class="card">
-      <h3>Login</h3>
-      <form id="login-form">
-        <input name="username" placeholder="Usuário" required />
-        <input name="password" type="password" placeholder="Senha" required />
-        <button class="primary">Entrar</button>
-      </form>
-      <p class="auth-note">Use <strong>admin</strong> / <strong>admin123</strong> para acessar.</p>
+    <div class="login-shell">
+      <div class="login-copy">
+        <span class="login-mark">✂</span>
+        <p class="eyebrow">Acesso restrito</p>
+        <h3>Painel administrativo</h3>
+        <p>Controle agenda, equipe, serviços e faturamento em uma área privada.</p>
+        <div class="login-highlights">
+          <span>Agenda</span>
+          <span>Clientes</span>
+          <span>Relatórios</span>
+        </div>
+      </div>
+      <div class="card login-card">
+        <p class="eyebrow">Entrar</p>
+        <h3>Bem-vindo de volta</h3>
+        <form id="login-form">
+          <label>
+            <span>Usuário</span>
+            <input name="username" placeholder="Digite seu usuário" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Senha</span>
+            <input name="password" type="password" placeholder="Digite sua senha" autocomplete="current-password" required />
+          </label>
+          <button class="primary">Entrar no painel</button>
+        </form>
+        <a class="link-button" href="/booking.html">Ver página de agendamento</a>
+      </div>
     </div>
   `;
 
@@ -237,10 +274,10 @@ const renderClients = (container) => {
     <div class="card">
       <h3>${state.editClient ? 'Editar cliente' : 'Novo cliente'}</h3>
       <form id="client-form">
-        <input name="name" placeholder="Nome" required value="${edit.name || ''}" />
-        <input name="phone" placeholder="Telefone" value="${edit.phone || ''}" />
-        <input name="email" type="email" placeholder="Email" value="${edit.email || ''}" />
-        <textarea name="notes" placeholder="Observações">${edit.notes || ''}</textarea>
+        <input name="name" placeholder="Nome" required value="${safeAttr(edit.name)}" />
+        <input name="phone" placeholder="Telefone" value="${safeAttr(edit.phone)}" />
+        <input name="email" type="email" placeholder="Email" value="${safeAttr(edit.email)}" />
+        <textarea name="notes" placeholder="Observacoes">${escapeHtml(edit.notes)}</textarea>
         <div>
           <button class="primary">${buttonLabel}</button>
           ${state.editClient ? '<button type="button" id="cancel-client" class="small-button">Cancelar</button>' : ''}
@@ -251,7 +288,7 @@ const renderClients = (container) => {
       <h3>Lista de clientes</h3>
       <table>
         <thead><tr><th>Nome</th><th>Telefone</th><th>Email</th><th>Notas</th><th>Ações</th></tr></thead>
-        <tbody>${state.clients.map(c => `<tr><td>${c.name}</td><td>${c.phone || '-'}</td><td>${c.email || '-'}</td><td>${c.notes || '-'}</td><td><button type="button" class="small-button edit-client" data-id="${c.id}">Editar</button><button type="button" class="small-button delete-client" data-id="${c.id}">Excluir</button></td></tr>`).join('')}</tbody>
+        <tbody>${state.clients.map(c => `<tr><td>${escapeHtml(c.name)}</td><td>${escapeHtml(c.phone || '-')}</td><td>${escapeHtml(c.email || '-')}</td><td>${escapeHtml(c.notes || '-')}</td><td><button type="button" class="small-button edit-client" data-id="${c.id}">Editar</button><button type="button" class="small-button delete-client" data-id="${c.id}">Excluir</button></td></tr>`).join('')}</tbody>
       </table>
     </div>
   `;
@@ -311,9 +348,9 @@ const renderBarbers = (container) => {
     <div class="card">
       <h3>${state.editBarber ? 'Editar barbeiro' : 'Novo barbeiro'}</h3>
       <form id="barber-form">
-        <input name="name" placeholder="Nome" required value="${edit.name || ''}" />
-        <input name="specialty" placeholder="Especialidade" value="${edit.specialty || ''}" />
-        <input name="phone" placeholder="Telefone" value="${edit.phone || ''}" />
+        <input name="name" placeholder="Nome" required value="${safeAttr(edit.name)}" />
+        <input name="specialty" placeholder="Especialidade" value="${safeAttr(edit.specialty)}" />
+        <input name="phone" placeholder="Telefone" value="${safeAttr(edit.phone)}" />
         <div>
           <button class="primary">${buttonLabel}</button>
           ${state.editBarber ? '<button type="button" id="cancel-barber" class="small-button">Cancelar</button>' : ''}
@@ -324,7 +361,7 @@ const renderBarbers = (container) => {
       <h3>Lista de barbeiros</h3>
       <table>
         <thead><tr><th>Nome</th><th>Especialidade</th><th>Telefone</th><th>Ações</th></tr></thead>
-        <tbody>${state.barbers.map(b => `<tr><td>${b.name}</td><td>${b.specialty || '-'}</td><td>${b.phone || '-'}</td><td><button type="button" class="small-button edit-barber" data-id="${b.id}">Editar</button><button type="button" class="small-button delete-barber" data-id="${b.id}">Excluir</button></td></tr>`).join('')}</tbody>
+        <tbody>${state.barbers.map(b => `<tr><td>${escapeHtml(b.name)}</td><td>${escapeHtml(b.specialty || '-')}</td><td>${escapeHtml(b.phone || '-')}</td><td><button type="button" class="small-button edit-barber" data-id="${b.id}">Editar</button><button type="button" class="small-button delete-barber" data-id="${b.id}">Excluir</button></td></tr>`).join('')}</tbody>
       </table>
     </div>
   `;
@@ -380,9 +417,9 @@ const renderServices = (container) => {
     <div class="card">
       <h3>${state.editService ? 'Editar serviço' : 'Novo serviço'}</h3>
       <form id="service-form">
-        <input name="name" placeholder="Nome do serviço" required value="${edit.name || ''}" />
-        <input name="duration" type="number" min="1" placeholder="Duração (minutos)" required value="${edit.duration || ''}" />
-        <input name="price" type="number" step="0.01" min="0" placeholder="Preço" required value="${edit.price || ''}" />
+        <input name="name" placeholder="Nome do serviço" required value="${safeAttr(edit.name)}" />
+        <input name="duration" type="number" min="1" placeholder="Duração (minutos)" required value="${safeAttr(edit.duration)}" />
+        <input name="price" type="number" step="0.01" min="0.01" placeholder="Preço" required value="${safeAttr(edit.price)}" />
         <div>
           <button class="primary">${buttonLabel}</button>
           ${state.editService ? '<button type="button" id="cancel-service" class="small-button">Cancelar</button>' : ''}
@@ -393,7 +430,7 @@ const renderServices = (container) => {
       <h3>Lista de serviços</h3>
       <table>
         <thead><tr><th>Nome</th><th>Duração</th><th>Preço</th><th>Ações</th></tr></thead>
-        <tbody>${state.services.map(s => `<tr><td>${s.name}</td><td>${s.duration} min</td><td>R$ ${Number(s.price).toFixed(2)}</td><td><button type="button" class="small-button edit-service" data-id="${s.id}">Editar</button><button type="button" class="small-button delete-service" data-id="${s.id}">Excluir</button></td></tr>`).join('')}</tbody>
+        <tbody>${state.services.map(s => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.duration)} min</td><td>${money(s.price)}</td><td><button type="button" class="small-button edit-service" data-id="${s.id}">Editar</button><button type="button" class="small-button delete-service" data-id="${s.id}">Excluir</button></td></tr>`).join('')}</tbody>
       </table>
     </div>
   `;
@@ -442,9 +479,9 @@ const renderServices = (container) => {
 };
 
 const renderAppointments = (container) => {
-  const clientOptions = state.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-  const barberOptions = state.barbers.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-  const serviceOptions = state.services.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const barberOptions = state.barbers.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  const serviceOptions = state.services.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
   const edit = state.editAppointment || { clientId: '', barberId: '', serviceId: '', date: '', time: '', status: 'Agendado', notes: '' };
   const buttonLabel = state.editAppointment ? 'Atualizar agendamento' : 'Salvar agendamento';
 
@@ -455,14 +492,14 @@ const renderAppointments = (container) => {
         <select name="clientId" required><option value="">Selecione o cliente</option>${clientOptions}</select>
         <select name="barberId" required><option value="">Selecione o barbeiro</option>${barberOptions}</select>
         <select name="serviceId" required><option value="">Selecione o serviço</option>${serviceOptions}</select>
-        <input name="date" type="date" required value="${edit.date || ''}" />
-        <input name="time" type="time" required value="${edit.time || ''}" />
+        <input name="date" type="date" required value="${safeAttr(edit.date)}" />
+        <input name="time" type="time" required value="${safeAttr(edit.time)}" />
         <select name="status">
           <option value="Agendado" ${edit.status === 'Agendado' ? 'selected' : ''}>Agendado</option>
           <option value="Concluido" ${edit.status === 'Concluido' ? 'selected' : ''}>Concluído</option>
           <option value="Cancelado" ${edit.status === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
         </select>
-        <textarea name="notes" placeholder="Observações">${edit.notes || ''}</textarea>
+        <textarea name="notes" placeholder="Observacoes">${escapeHtml(edit.notes)}</textarea>
         <div>
           <button class="primary">${buttonLabel}</button>
           ${state.editAppointment ? '<button type="button" id="cancel-appointment" class="small-button">Cancelar</button>' : ''}
@@ -473,7 +510,7 @@ const renderAppointments = (container) => {
       <h3>Agenda</h3>
       <table>
         <thead><tr><th>Cliente</th><th>Barbeiro</th><th>Serviço</th><th>Data</th><th>Hora</th><th>Status</th><th>Ações</th></tr></thead>
-        <tbody>${state.appointments.map(a => `<tr><td>${a.clientName}</td><td>${a.barberName}</td><td>${a.serviceName}</td><td>${a.date}</td><td>${a.time}</td><td><span class="status ${a.status}">${a.status}</span></td><td><button type="button" class="small-button edit-appointment" data-id="${a.id}">Editar</button><button type="button" class="small-button delete-appointment" data-id="${a.id}">Excluir</button></td></tr>`).join('')}</tbody>
+        <tbody>${state.appointments.map(a => `<tr><td>${escapeHtml(a.clientName)}</td><td>${escapeHtml(a.barberName)}</td><td>${escapeHtml(a.serviceName)}</td><td>${escapeHtml(a.date)}</td><td>${escapeHtml(a.time)}</td><td><span class="status ${safeAttr(a.status)}">${escapeHtml(formatStatus(a.status))}</span></td><td><button type="button" class="small-button edit-appointment" data-id="${a.id}">Editar</button><button type="button" class="small-button delete-appointment" data-id="${a.id}">Excluir</button></td></tr>`).join('')}</tbody>
       </table>
     </div>
   `;
@@ -531,17 +568,18 @@ const renderAppointments = (container) => {
 };
 
 const renderUsers = (container) => {
-  const edit = state.editUser || { username: '', password: '', role: 'user' };
+  const edit = state.editUser || { username: '', password: '', role: 'attendant' };
   const buttonLabel = state.editUser ? 'Atualizar usuário' : 'Salvar usuário';
 
   container.innerHTML = `
     <div class="card">
       <h3>${state.editUser ? 'Editar usuário' : 'Novo usuário'}</h3>
       <form id="user-form">
-        <input name="username" placeholder="Usuário" required value="${edit.username || ''}" />
+        <input name="username" placeholder="Usuario" required value="${safeAttr(edit.username)}" />
         <input name="password" type="password" placeholder="Senha" ${state.editUser ? '' : 'required'} />
         <select name="role" required>
-          <option value="user" ${edit.role === 'user' ? 'selected' : ''}>Usuário</option>
+          <option value="attendant" ${edit.role === 'attendant' ? 'selected' : ''}>Atendente</option>
+          <option value="manager" ${edit.role === 'manager' ? 'selected' : ''}>Gerente</option>
           <option value="admin" ${edit.role === 'admin' ? 'selected' : ''}>Administrador</option>
         </select>
         <div>
@@ -555,7 +593,7 @@ const renderUsers = (container) => {
       ${state.users.length === 0 ? '<p class="message">Nenhum usuário cadastrado.</p>' : `
         <table>
           <thead><tr><th>Usuário</th><th>Função</th><th>Ações</th></tr></thead>
-          <tbody>${state.users.map(u => `<tr><td>${u.username}</td><td>${u.role}</td><td><button type="button" class="small-button edit-user" data-id="${u.id}">Editar</button><button type="button" class="small-button delete-user" data-id="${u.id}">Excluir</button></td></tr>`).join('')}</tbody>
+          <tbody>${state.users.map(u => `<tr><td>${escapeHtml(u.username)}</td><td>${escapeHtml(u.role)}</td><td><button type="button" class="small-button edit-user" data-id="${u.id}">Editar</button><button type="button" class="small-button delete-user" data-id="${u.id}">Excluir</button></td></tr>`).join('')}</tbody>
         </table>
       `}
     </div>
@@ -635,14 +673,14 @@ const renderReports = (container) => {
         <p>Agendados: <strong>${report.summary.scheduledCount}</strong></p>
         <p>Concluídos: <strong>${report.summary.completedCount}</strong></p>
         <p>Cancelados: <strong>${report.summary.canceledCount}</strong></p>
-        <p>Faturamento: <strong>R$ ${Number(report.summary.totalRevenue).toFixed(2)}</strong></p>
+        <p>Faturamento: <strong>${money(report.summary.totalRevenue)}</strong></p>
       </div>
     </div>
     <div class="card table-wrapper">
       <h3>Receita por barbeiro</h3>
       <table>
         <thead><tr><th>Barbeiro</th><th>Agendamentos</th><th>Faturamento</th></tr></thead>
-        <tbody>${report.byBarber.map(b => `<tr><td>${b.barberName}</td><td>${b.totalAppointments}</td><td>R$ ${Number(b.revenue).toFixed(2)}</td></tr>`).join('')}</tbody>
+        <tbody>${report.byBarber.map(b => `<tr><td>${escapeHtml(b.barberName)}</td><td>${escapeHtml(b.totalAppointments)}</td><td>${money(b.revenue)}</td></tr>`).join('')}</tbody>
       </table>
     </div>
   `;
@@ -699,3 +737,5 @@ const init = async () => {
 };
 
 init();
+
+

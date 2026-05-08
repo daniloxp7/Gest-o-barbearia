@@ -7,10 +7,39 @@ const { db, init } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-change-me';
+const VALID_ROLES = ['admin', 'manager', 'attendant'];
+const VALID_STATUSES = ['Agendado', 'Concluido', 'Cancelado'];
+const PUBLIC_TIME_SLOTS = [
+  '09:00', '09:30', '10:00', '10:30',
+  '11:00', '11:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30',
+  '16:00', '16:30', '17:00', '17:30'
+];
+const loginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 8;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
-app.use(cors());
-app.use(express.json());
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET deve ser definido em producao.');
+}
+
+if (!process.env.JWT_SECRET) {
+  console.warn('Aviso: usando JWT_SECRET de desenvolvimento. Defina JWT_SECRET antes de publicar.');
+}
+
+const allowedOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : false;
+
+app.disable('x-powered-by');
+app.use(cors({ origin: allowedOrigins }));
+app.use(express.json({ limit: '32kb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 const queryAll = (sql, params = []) => new Promise((resolve, reject) => {
@@ -33,6 +62,138 @@ const runSql = (sql, params = []) => new Promise((resolve, reject) => {
     else resolve({ id: this.lastID, changes: this.changes });
   });
 });
+
+const isPositiveNumber = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+const normalizeStatus = (status) => status || 'Agendado';
+const validateRole = (role) => VALID_ROLES.includes(role);
+const validateStatus = (status) => VALID_STATUSES.includes(normalizeStatus(status));
+const isIsoDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || '');
+const isTime = (value) => /^\d{2}:\d{2}$/.test(value || '');
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const toMinutes = (time) => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return (hours * 60) + minutes;
+};
+const overlaps = (startA, durationA, startB, durationB) => {
+  const endA = startA + durationA;
+  const endB = startB + durationB;
+  return startA < endB && startB < endA;
+};
+
+const assertDateTime = ({ date, time, allowPast = true }) => {
+  if (!isIsoDate(date) || !isTime(time)) {
+    const error = new Error('Data ou horario invalido');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!allowPast && date < todayIso()) {
+    const error = new Error('Nao e possivel agendar em data passada');
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const assertAppointmentReferences = async (clientId, barberId, serviceId) => {
+  const [client, barber, service] = await Promise.all([
+    queryOne('SELECT id FROM clients WHERE id = ?', [clientId]),
+    queryOne('SELECT id FROM barbers WHERE id = ?', [barberId]),
+    queryOne('SELECT id FROM services WHERE id = ?', [serviceId])
+  ]);
+
+  if (!client || !barber || !service) {
+    const error = new Error('Cliente, barbeiro ou servico nao encontrado');
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
+const assertAvailableSlot = async ({ barberId, serviceId, date, time, appointmentId = null, status = 'Agendado' }) => {
+  if (normalizeStatus(status) === 'Cancelado') return;
+
+  const service = await queryOne('SELECT duration FROM services WHERE id = ?', [serviceId]);
+  if (!service) {
+    const error = new Error('Servico nao encontrado');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const params = [barberId, date];
+  let sql = `
+    SELECT a.id, a.time, s.duration
+    FROM appointments a
+    JOIN services s ON s.id = a.serviceId
+    WHERE a.barberId = ? AND a.date = ? AND a.status <> 'Cancelado'
+  `;
+
+  if (appointmentId) {
+    sql += ' AND a.id <> ?';
+    params.push(appointmentId);
+  }
+
+  const appointments = await queryAll(sql, params);
+  const requestedStart = toMinutes(time);
+  const conflict = appointments.find((appointment) => (
+    overlaps(requestedStart, Number(service.duration), toMinutes(appointment.time), Number(appointment.duration))
+  ));
+
+  if (conflict) {
+    const error = new Error('Ja existe um agendamento para este barbeiro neste horario');
+    error.statusCode = 409;
+    throw error;
+  }
+};
+
+const sendError = (res, err) => {
+  res.status(err.statusCode || 500).json({ error: err.message });
+};
+
+const findOrCreateClient = async ({ name, phone, email }) => {
+  const cleanPhone = (phone || '').trim();
+  const cleanEmail = (email || '').trim();
+
+  if (cleanPhone) {
+    const byPhone = await queryOne('SELECT id FROM clients WHERE phone = ?', [cleanPhone]);
+    if (byPhone) return byPhone.id;
+  }
+
+  if (cleanEmail) {
+    const byEmail = await queryOne('SELECT id FROM clients WHERE email = ?', [cleanEmail]);
+    if (byEmail) return byEmail.id;
+  }
+
+  const result = await runSql(
+    'INSERT INTO clients (name, phone, email, notes) VALUES (?, ?, ?, ?)',
+    [name.trim(), cleanPhone, cleanEmail, 'Cliente cadastrado pelo agendamento online']
+  );
+  return result.id;
+};
+
+const loginKey = (req, username) => `${req.ip}:${String(username || '').toLowerCase()}`;
+
+const isLoginBlocked = (key) => {
+  const entry = loginAttempts.get(key);
+  if (!entry) return false;
+
+  if (Date.now() - entry.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.delete(key);
+    return false;
+  }
+
+  return entry.count >= MAX_LOGIN_ATTEMPTS;
+};
+
+const recordFailedLogin = (key) => {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (!entry || now - entry.firstAttempt > LOGIN_WINDOW_MS) {
+    loginAttempts.set(key, { count: 1, firstAttempt: now });
+    return;
+  }
+
+  entry.count += 1;
+  loginAttempts.set(key, entry);
+};
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -61,11 +222,97 @@ const requireRole = (roles) => {
 };
 
 app.use('/api', (req, res, next) => {
-  const publicPaths = ['/login'];
+  const publicPaths = ['/login', '/public/data', '/public/availability', '/public/appointments'];
   if (publicPaths.includes(req.path) || req.method === 'OPTIONS') {
     return next();
   }
   return authMiddleware(req, res, next);
+});
+
+app.get('/api/public/data', async (req, res) => {
+  try {
+    const [barbers, services] = await Promise.all([
+      queryAll('SELECT id, name, specialty FROM barbers ORDER BY name'),
+      queryAll(`
+        SELECT id, name, duration, price
+        FROM services
+        ORDER BY
+          CASE name
+            WHEN 'Cabelo' THEN 1
+            WHEN 'Barba' THEN 2
+            WHEN 'Cabelo + Barba' THEN 3
+            ELSE 4
+          END,
+          name
+      `)
+    ]);
+    res.json({ barbers, services, timeSlots: PUBLIC_TIME_SLOTS });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.get('/api/public/availability', async (req, res) => {
+  const { barberId, serviceId, date } = req.query;
+  if (!barberId || !serviceId || !date) {
+    return res.status(400).json({ error: 'Barbeiro, servico e data sao obrigatorios' });
+  }
+
+  try {
+    assertDateTime({ date, time: '00:00', allowPast: false });
+    const barber = await queryOne('SELECT id FROM barbers WHERE id = ?', [barberId]);
+    const service = await queryOne('SELECT id, duration FROM services WHERE id = ?', [serviceId]);
+    if (!barber) return res.status(404).json({ error: 'Barbeiro nao encontrado' });
+    if (!service) return res.status(404).json({ error: 'Servico nao encontrado' });
+
+    const booked = await queryAll(
+      `SELECT a.time, s.duration
+       FROM appointments a
+       JOIN services s ON s.id = a.serviceId
+       WHERE a.barberId = ? AND a.date = ? AND a.status <> 'Cancelado'`,
+      [barberId, date]
+    );
+    const availableTimes = PUBLIC_TIME_SLOTS.filter((slot) => {
+      const slotStart = toMinutes(slot);
+      return !booked.some((item) => overlaps(slotStart, Number(service.duration), toMinutes(item.time), Number(item.duration)));
+    });
+    const bookedTimes = PUBLIC_TIME_SLOTS.filter((slot) => !availableTimes.includes(slot));
+
+    res.json({ bookedTimes, availableTimes });
+  } catch (err) {
+    sendError(res, err);
+  }
+});
+
+app.post('/api/public/appointments', async (req, res) => {
+  const { name, phone, email, barberId, serviceId, date, time, notes } = req.body;
+  if (!name || !phone || !barberId || !serviceId || !date || !time) {
+    return res.status(400).json({ error: 'Nome, telefone, barbeiro, servico, data e horario sao obrigatorios' });
+  }
+
+  if (!PUBLIC_TIME_SLOTS.includes(time)) {
+    return res.status(400).json({ error: 'Horario indisponivel para agendamento online' });
+  }
+
+  try {
+    assertDateTime({ date, time, allowPast: false });
+    const service = await queryOne('SELECT id FROM services WHERE id = ?', [serviceId]);
+    const barber = await queryOne('SELECT id FROM barbers WHERE id = ?', [barberId]);
+    if (!service || !barber) {
+      return res.status(400).json({ error: 'Barbeiro ou servico nao encontrado' });
+    }
+
+    await assertAvailableSlot({ barberId, serviceId, date, time });
+    const clientId = await findOrCreateClient({ name, phone, email });
+    const result = await runSql(
+      'INSERT INTO appointments (clientId, barberId, serviceId, date, time, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [clientId, barberId, serviceId, date, time, 'Agendado', notes || 'Agendamento feito pelo cliente']
+    );
+
+    res.json({ id: result.id, date, time, status: 'Agendado' });
+  } catch (err) {
+    sendError(res, err);
+  }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -74,13 +321,25 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
   }
 
+  const attemptKey = loginKey(req, username);
+  if (isLoginBlocked(attemptKey)) {
+    return res.status(429).json({ error: 'Muitas tentativas de login. Tente novamente em alguns minutos.' });
+  }
+
   try {
     const user = await queryOne('SELECT * FROM users WHERE username = ?', [username]);
-    if (!user) return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (!user) {
+      recordFailedLogin(attemptKey);
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
 
     const valid = bcrypt.compareSync(password, user.password);
-    if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
+    if (!valid) {
+      recordFailedLogin(attemptKey);
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
 
+    loginAttempts.delete(attemptKey);
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token, username: user.username, role: user.role });
   } catch (err) {
@@ -107,6 +366,10 @@ app.post('/api/users', requireRole('admin'), async (req, res) => {
     return res.status(400).json({ error: 'Usuário, senha e função são obrigatórios' });
   }
 
+  if (!validateRole(role)) {
+    return res.status(400).json({ error: 'Funcao invalida' });
+  }
+
   try {
     const hash = bcrypt.hashSync(password, 10);
     const result = await runSql('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hash, role]);
@@ -124,6 +387,10 @@ app.put('/api/users/:id', requireRole('admin'), async (req, res) => {
   const { username, password, role } = req.body;
   if (!username || !role) {
     return res.status(400).json({ error: 'Usuário e função são obrigatórios' });
+  }
+
+  if (!validateRole(role)) {
+    return res.status(400).json({ error: 'Funcao invalida' });
   }
 
   try {
@@ -268,6 +535,10 @@ app.get('/api/services', async (req, res) => {
 app.post('/api/services', async (req, res) => {
   const { name, duration, price } = req.body;
   if (!name || !duration || !price) return res.status(400).json({ error: 'Nome, duração e preço são obrigatórios' });
+  if (!isPositiveNumber(duration) || !isPositiveNumber(price)) {
+    return res.status(400).json({ error: 'Duracao e preco devem ser maiores que zero' });
+  }
+
   try {
     const result = await runSql(
       'INSERT INTO services (name, duration, price) VALUES (?, ?, ?)',
@@ -283,6 +554,10 @@ app.put('/api/services/:id', async (req, res) => {
   const { id } = req.params;
   const { name, duration, price } = req.body;
   if (!name || !duration || !price) return res.status(400).json({ error: 'Nome, duração e preço são obrigatórios' });
+  if (!isPositiveNumber(duration) || !isPositiveNumber(price)) {
+    return res.status(400).json({ error: 'Duracao e preco devem ser maiores que zero' });
+  }
+
   try {
     await runSql('UPDATE services SET name = ?, duration = ?, price = ? WHERE id = ?', [name, duration, price, id]);
     res.json({ id, name, duration, price });
@@ -329,14 +604,21 @@ app.post('/api/appointments', async (req, res) => {
   if (!clientId || !barberId || !serviceId || !date || !time) {
     return res.status(400).json({ error: 'Todos os campos principais são obrigatórios' });
   }
+  if (!validateStatus(status)) {
+    return res.status(400).json({ error: 'Status invalido' });
+  }
+
   try {
+    assertDateTime({ date, time });
+    await assertAppointmentReferences(clientId, barberId, serviceId);
+    await assertAvailableSlot({ barberId, serviceId, date, time, status });
     const result = await runSql(
       'INSERT INTO appointments (clientId, barberId, serviceId, date, time, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [clientId, barberId, serviceId, date, time, status || 'Agendado', notes || '']
+      [clientId, barberId, serviceId, date, time, normalizeStatus(status), notes || '']
     );
-    res.json({ id: result.id, clientId, barberId, serviceId, date, time, status: status || 'Agendado', notes });
+    res.json({ id: result.id, clientId, barberId, serviceId, date, time, status: normalizeStatus(status), notes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 
@@ -346,14 +628,24 @@ app.put('/api/appointments/:id', async (req, res) => {
   if (!clientId || !barberId || !serviceId || !date || !time) {
     return res.status(400).json({ error: 'Todos os campos principais são obrigatórios' });
   }
+  if (!validateStatus(status)) {
+    return res.status(400).json({ error: 'Status invalido' });
+  }
+
   try {
+    assertDateTime({ date, time });
+    const current = await queryOne('SELECT id FROM appointments WHERE id = ?', [id]);
+    if (!current) return res.status(404).json({ error: 'Agendamento nao encontrado' });
+
+    await assertAppointmentReferences(clientId, barberId, serviceId);
+    await assertAvailableSlot({ barberId, serviceId, date, time, appointmentId: id, status });
     await runSql(
       'UPDATE appointments SET clientId = ?, barberId = ?, serviceId = ?, date = ?, time = ?, status = ?, notes = ? WHERE id = ?',
-      [clientId, barberId, serviceId, date, time, status || 'Agendado', notes || '', id]
+      [clientId, barberId, serviceId, date, time, normalizeStatus(status), notes || '', id]
     );
-    res.json({ id, clientId, barberId, serviceId, date, time, status: status || 'Agendado', notes });
+    res.json({ id, clientId, barberId, serviceId, date, time, status: normalizeStatus(status), notes });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err);
   }
 });
 

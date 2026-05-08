@@ -1,43 +1,55 @@
 # Sistema de Gestão de Barbearia
 
-Aplicação simples para gerenciamento de barbearia com cadastro de clientes, barbeiros, serviços e agendamentos.
+Aplicação para gerenciamento de barbearia com painel administrativo, agenda interna e página pública de agendamento.
 
 ## Como usar
 
-1. Abra o terminal em `c:\Users\danil\Documents\barbearia`
+1. Abra o terminal em `C:\Users\danil\Documents\barbearia`
 2. Execute:
    - `npm install`
    - `npm start`
 3. Abra no navegador:
-   - `http://localhost:3000`
+   - Painel: `http://localhost:3000`
+   - Agendamento público: `http://localhost:3000/booking.html`
 
 ## Funcionalidades
 
-- Login e autenticação
+- Login com autenticação JWT
 - Cadastro, edição e exclusão de clientes
 - Cadastro, edição e exclusão de barbeiros
 - Cadastro, edição e exclusão de serviços
 - Cadastro, edição e exclusão de agendamentos
+- Agendamento público com validação de disponibilidade por duração do serviço
 - Relatórios de faturamento e produtividade
+- Gerenciamento de usuários por administradores
 
-## Login padrão
+## Login padrão de desenvolvimento
 
 - Usuário: `admin`
 - Senha: `admin123`
 
-## Gerenciamento de usuários
+Defina `INITIAL_ADMIN_PASSWORD` antes do primeiro uso em produção. Em produção, o sistema não cria o usuário inicial com senha padrão.
 
-- O administrador pode criar, editar e excluir usuários.
-- Funções disponíveis: `admin`, `manager`, `attendant`.
-- O botão de usuários fica visível apenas para administradores.
+## Variáveis de ambiente recomendadas
+
+- `JWT_SECRET`: chave secreta obrigatória em produção.
+- `INITIAL_ADMIN_PASSWORD`: senha do administrador inicial.
+- `CORS_ORIGIN`: origens permitidas, separadas por vírgula, quando a API for acessada por outro domínio.
+- `PORT`: porta do servidor, padrão `3000`.
+
+## Perfis de usuário
+
+- `admin`: acesso completo, incluindo usuários.
+- `manager`: acesso ao painel operacional.
+- `attendant`: acesso ao painel operacional.
 
 ## Estrutura
 
-- `server.js` - servidor Express + API REST
-- `db.js` - banco SQLite local
-- `public/` - frontend em HTML, CSS e JavaScript
-- `barbearia.db` - banco de dados gerado automaticamente
+- `server.js`: servidor Express + API REST
+- `db.js`: banco SQLite local
+- `public/`: frontend em HTML, CSS e JavaScript
+- `barbearia.db`: banco de dados local gerado automaticamente
 
-## Observações
+## Verificação
 
-Se o seu Node.js estiver em versão antiga, considere atualizar para Node 18+ para evitar avisos de compatibilidade.
+Execute `npm run check` para validar a sintaxe dos principais arquivos JavaScript.

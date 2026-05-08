@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agendar Horário</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="public-booking">
+  <header class="booking-hero">
+    <div class="booking-hero__content">
+      <div class="booking-hero__copy">
+        <p class="eyebrow">Barbearia Premium</p>
+        <h1>Agende seu horário</h1>
+        <p class="tagline">Escolha o serviço, informe seus dados e confirme o melhor horário.</p>
+        <div class="hero-actions">
+          <a class="primary-link" href="#services">Ver serviços</a>
+          <a class="ghost-link" href="/">Área administrativa</a>
+        </div>
+      </div>
+      <div class="booking-hero__panel" aria-label="Informações da barbearia">
+        <span class="brand-icon">✂</span>
+        <strong>Barbearia Premium</strong>
+        <p>Cortes, barba e acabamentos com agenda controlada.</p>
+        <dl>
+          <div><dt>Horários</dt><dd>Seg a sáb, 09:00 às 18:00</dd></div>
+          <div><dt>Contato</dt><dd>WhatsApp no cadastro</dd></div>
+        </dl>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="public-strip" aria-label="Destaques">
+      <div>
+        <strong>Escolha o serviço</strong>
+        <span>Cabelo, barba, combo ou outros cadastrados.</span>
+      </div>
+      <div>
+        <strong>Informe seus dados</strong>
+        <span>Nome, telefone e preferências em pop-up.</span>
+      </div>
+      <div>
+        <strong>Confirme o horário</strong>
+        <span>A reserva é criada ao finalizar.</span>
+      </div>
+    </section>
+
+    <section id="services" class="public-section">
+      <div class="section-heading">
+        <p class="eyebrow">Serviços</p>
+        <h2>Selecione o atendimento</h2>
+      </div>
+      <div id="service-preview" class="service-preview"></div>
+    </section>
+  </main>
+
+  <div id="booking-modal" class="modal" hidden>
+    <button class="modal-backdrop" type="button" data-close-modal aria-label="Fechar agendamento"></button>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <div>
+          <p class="eyebrow">Agendamento</p>
+          <h2 id="modal-title">Complete suas informações</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-modal aria-label="Fechar">×</button>
+      </div>
+
+      <div class="booking-layout booking-layout--modal">
+        <section class="card">
+          <h3>Dados do atendimento</h3>
+          <form id="booking-form">
+            <input name="serviceId" type="hidden" required />
+            <input name="name" placeholder="Seu nome" autocomplete="name" required />
+            <input name="phone" placeholder="Telefone / WhatsApp" autocomplete="tel" required />
+
+            <select name="barberId" required>
+              <option value="">Escolha o barbeiro</option>
+            </select>
+
+            <input name="date" type="date" required />
+
+            <select name="time" required disabled>
+              <option value="">Escolha data e barbeiro</option>
+            </select>
+
+            <button class="primary">Confirmar agendamento</button>
+            <p id="booking-message" class="auth-note" role="status"></p>
+          </form>
+        </section>
+
+        <aside class="card booking-summary">
+          <h3>Resumo</h3>
+          <div class="message" id="booking-summary">
+            <p>Selecione um serviço para ver duração e preço.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <script src="booking.js"></script>
+</body>
+</html>

@@ -19,6 +19,13 @@ const exec = (sql, params = []) => new Promise((resolve, reject) => {
   });
 });
 
+const getOne = (sql, params = []) => new Promise((resolve, reject) => {
+  db.get(sql, params, (err, row) => {
+    if (err) reject(err);
+    else resolve(row);
+  });
+});
+
 const init = async () => {
   await exec(`CREATE TABLE IF NOT EXISTS clients (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,6 +49,19 @@ const init = async () => {
     price REAL NOT NULL
   )`);
 
+  const serviceCount = await getOne('SELECT COUNT(*) AS count FROM services');
+  if (serviceCount.count === 0) {
+    const defaultServices = [
+      ['Cabelo', 30, 35],
+      ['Barba', 30, 25],
+      ['Cabelo + Barba', 60, 55]
+    ];
+
+    for (const service of defaultServices) {
+      await exec('INSERT INTO services (name, duration, price) VALUES (?, ?, ?)', service);
+    }
+  }
+
   await exec(`CREATE TABLE IF NOT EXISTS appointments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     clientId INTEGER NOT NULL,
@@ -63,16 +83,19 @@ const init = async () => {
     role TEXT NOT NULL DEFAULT 'admin'
   )`);
 
-  const defaultPassword = bcrypt.hashSync('admin123', 10);
-  const count = await new Promise((resolve, reject) => {
-    db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
-      if (err) reject(err);
-      else resolve(row.count);
-    });
-  });
+  const count = await getOne('SELECT COUNT(*) AS count FROM users');
 
-  if (count === 0) {
+  if (count.count === 0) {
+    if (process.env.NODE_ENV === 'production' && !process.env.INITIAL_ADMIN_PASSWORD) {
+      throw new Error('INITIAL_ADMIN_PASSWORD deve ser definido para criar o usuario inicial em producao.');
+    }
+
+    const initialAdminPassword = process.env.INITIAL_ADMIN_PASSWORD || 'admin123';
+    const defaultPassword = bcrypt.hashSync(initialAdminPassword, 10);
     await exec('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ['admin', defaultPassword, 'admin']);
+    if (!process.env.INITIAL_ADMIN_PASSWORD) {
+      console.warn('Usuario inicial criado: admin/admin123. Altere a senha no primeiro acesso.');
+    }
   }
 };
 

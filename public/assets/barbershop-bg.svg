@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#d8b86d"/>
+      <stop offset="1" stop-color="#8d6826"/>
+    </linearGradient>
+    <pattern id="pinstripe" width="80" height="80" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <rect width="80" height="80" fill="none"/>
+      <path d="M 0 0 L 0 80" stroke="#d8b86d" stroke-width="4" opacity="0.4"/>
+      <path d="M 24 0 L 24 80" stroke="#f4ead4" stroke-width="2" opacity="0.22"/>
+      <path d="M 48 0 L 48 80" stroke="#173f34" stroke-width="4" opacity="0.35"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#101613"/>
+  <rect width="1600" height="1000" fill="url(#pinstripe)" opacity="0.35"/>
+
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round" opacity="0.78">
+    <path d="M1090 208c72 0 130 58 130 130v98c0 57-46 103-103 103h-54v160h-74V539h-54c-57 0-103-46-103-103v-98c0-72 58-130 130-130h128z" stroke-width="18"/>
+    <path d="M906 390h240M934 698h210M1039 540v158M1001 238h50c41 0 74 33 74 74v58" stroke-width="14"/>
+
+    <path d="M310 295l260 260M570 295L310 555" stroke-width="16"/>
+    <circle cx="285" cy="270" r="56" stroke-width="15"/>
+    <circle cx="595" cy="580" r="56" stroke-width="15"/>
+    <path d="M450 432l84-84M346 536l84-84" stroke-width="12"/>
+
+    <path d="M1230 690c86-30 164-30 250 0M1270 735c61-20 111-20 170 0" stroke-width="14"/>
+    <path d="M1302 638c34-54 98-54 132 0" stroke-width="14"/>
+
+    <path d="M155 735h310M200 682h220M238 628h144" stroke-width="14"/>
+  </g>
+</svg>

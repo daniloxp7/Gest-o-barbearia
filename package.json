@@ -1,11 +1,12 @@
 {
   "name": "barbearia-gestao",
   "version": "1.0.0",
-  "description": "Sistema de gestão para barbearia com agenda, clientes, barbeiros e serviços.",
+  "description": "Sistema de gestao para barbearia com agenda, clientes, barbeiros e servicos.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "check": "node --check server.js && node --check public/app.js && node --check public/booking.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
