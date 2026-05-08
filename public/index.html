@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão de Barbearia</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <div class="brand-block">
+        <span class="brand-icon">💈</span>
+        <div>
+          <p class="eyebrow">Barbearia Premium</p>
+          <h1>Gestão de Barbearia</h1>
+          <p class="tagline">Controle completo de agendamentos, equipe e faturamento com estilo.</p>
+        </div>
+      </div>
+      <div class="auth-actions">
+        <button id="logout" hidden>Sair</button>
+      </div>
+    </div>
+    <nav>
+      <button data-view="dashboard" data-icon="🏠" class="active">Dashboard</button>
+      <button data-view="clients" data-icon="👥">Clientes</button>
+      <button data-view="barbers" data-icon="✂️">Barbeiros</button>
+      <button data-view="services" data-icon="🪒">Serviços</button>
+      <button data-view="appointments" data-icon="📅">Agendamentos</button>
+      <button data-view="reports" data-icon="📊">Relatórios</button>
+      <button data-view="users" data-icon="👤">Usuários</button>
+    </nav>
+  </header>
+
+  <main id="app">
+    <section id="page-title"><h2>Clientes</h2></section>
+    <div id="content"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
