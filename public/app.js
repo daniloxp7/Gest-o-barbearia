@@ -28,6 +28,17 @@ const escapeHtml = (value = '') => String(value)
 
 const safeAttr = escapeHtml;
 const money = (value) => `R$ ${Number(value || 0).toFixed(2)}`;
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const formatDate = (value) => {
+  if (!value) return '-';
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
+};
+const phoneDigits = (value = '') => String(value).replace(/\D/g, '');
+const whatsappLink = (phone) => {
+  const digits = phoneDigits(phone);
+  return digits ? `https://wa.me/55${digits}` : '';
+};
 const formatStatus = (status) => ({
   Agendado: 'Agendado',
   Concluido: 'Concluido',
@@ -156,13 +167,81 @@ const render = () => {
   `;
   const content = $('#content');
   if (!state.loggedIn) return renderLogin(content);
-  if (state.view === 'dashboard') return renderDashboard(content);
+  if (state.view === 'dashboard') return renderDashboardV2(content);
   if (state.view === 'clients') return renderClients(content);
   if (state.view === 'barbers') return renderBarbers(content);
   if (state.view === 'services') return renderServices(content);
   if (state.view === 'appointments') return renderAppointments(content);
   if (state.view === 'reports') return renderReports(content);
   if (state.view === 'users') return renderUsers(content);
+};
+
+const renderDashboardV2 = (container) => {
+  const today = todayIso();
+  const todayAppointments = state.appointments
+    .filter((item) => item.date === today)
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const nextAppointments = state.appointments
+    .filter((item) => item.status === 'Agendado' && item.date >= today)
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+    .slice(0, 5);
+  const completed = state.appointments.filter((item) => item.status === 'Concluido').length;
+  const scheduled = state.appointments.filter((item) => item.status === 'Agendado').length;
+  const canceled = state.appointments.filter((item) => item.status === 'Cancelado').length;
+  const revenue = state.appointments
+    .filter((item) => item.status === 'Concluido')
+    .reduce((total, item) => total + Number(item.servicePrice || 0), 0);
+  const todayRevenue = todayAppointments
+    .filter((item) => item.status === 'Concluido')
+    .reduce((total, item) => total + Number(item.servicePrice || 0), 0);
+
+  container.innerHTML = `
+    <div class="dashboard-grid">
+      <div class="metric-card"><h4>Hoje</h4><p>${todayAppointments.length}</p><span>agendamentos</span></div>
+      <div class="metric-card"><h4>Agendados</h4><p>${scheduled}</p><span>em aberto</span></div>
+      <div class="metric-card"><h4>Faturamento hoje</h4><p>${money(todayRevenue)}</p><span>concluidos</span></div>
+      <div class="metric-card"><h4>Faturamento total</h4><p>${money(revenue)}</p><span>concluidos</span></div>
+    </div>
+    <div class="dashboard-panels">
+      <section class="card">
+        <div class="card-heading"><h3>Agenda de hoje</h3><span>${formatDate(today)}</span></div>
+        ${todayAppointments.length ? `
+          <div class="appointment-list">
+            ${todayAppointments.map((item) => `
+              <article class="appointment-item">
+                <strong>${escapeHtml(item.time)} - ${escapeHtml(item.clientName)}</strong>
+                <span>${escapeHtml(item.serviceName)} com ${escapeHtml(item.barberName)}</span>
+                <em class="status ${safeAttr(item.status)}">${escapeHtml(formatStatus(item.status))}</em>
+              </article>
+            `).join('')}
+          </div>
+        ` : '<p class="empty-state">Nenhum agendamento para hoje.</p>'}
+      </section>
+      <section class="card">
+        <div class="card-heading"><h3>Proximos horarios</h3><span>${nextAppointments.length} pendentes</span></div>
+        ${nextAppointments.length ? `
+          <div class="appointment-list">
+            ${nextAppointments.map((item) => `
+              <article class="appointment-item">
+                <strong>${formatDate(item.date)} - ${escapeHtml(item.time)}</strong>
+                <span>${escapeHtml(item.clientName)} - ${escapeHtml(item.serviceName)}</span>
+                <em>${escapeHtml(item.barberName)}</em>
+              </article>
+            `).join('')}
+          </div>
+        ` : '<p class="empty-state">Nenhum proximo horario agendado.</p>'}
+      </section>
+    </div>
+    <div class="card status-overview">
+      <div class="status-row">
+        <span class="status-pill">Clientes: ${state.clients.length}</span>
+        <span class="status-pill">Barbeiros: ${state.barbers.length}</span>
+        <span class="status-pill">Servicos: ${state.services.length}</span>
+        <span class="status-pill">Concluidos: ${completed}</span>
+        <span class="status-pill">Cancelados: ${canceled}</span>
+      </div>
+    </div>
+  `;
 };
 
 const renderDashboard = (container) => {
@@ -478,6 +557,22 @@ const renderServices = (container) => {
   }
 };
 
+const updateAppointmentStatus = async (appointment, status) => {
+  await fetchJson(`/api/appointments/${appointment.id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      clientId: appointment.clientId,
+      barberId: appointment.barberId,
+      serviceId: appointment.serviceId,
+      date: appointment.date,
+      time: appointment.time,
+      status,
+      notes: appointment.notes || ''
+    })
+  });
+  await refresh();
+};
+
 const renderAppointments = (container) => {
   const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
   const barberOptions = state.barbers.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
@@ -506,8 +601,30 @@ const renderAppointments = (container) => {
         </div>
       </form>
     </div>
-    <div class="card table-wrapper">
+    <div class="card agenda-wrapper">
       <h3>Agenda</h3>
+      <div class="agenda-cards">
+        ${state.appointments.map((a) => {
+          const wa = whatsappLink(a.clientPhone);
+          return `
+            <article class="agenda-card">
+              <div>
+                <strong>${escapeHtml(a.clientName)}</strong>
+                <span>${formatDate(a.date)} - ${escapeHtml(a.time)} · ${escapeHtml(a.serviceName)}</span>
+                <small>${escapeHtml(a.barberName)}${a.clientPhone ? ` · ${escapeHtml(a.clientPhone)}` : ''}</small>
+              </div>
+              <span class="status ${safeAttr(a.status)}">${escapeHtml(formatStatus(a.status))}</span>
+              <div class="table-actions">
+                ${wa ? `<a class="small-button whatsapp-action" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+                ${a.status !== 'Concluido' ? `<button type="button" class="small-button complete-appointment" data-id="${a.id}">Concluir</button>` : ''}
+                ${a.status !== 'Cancelado' ? `<button type="button" class="small-button cancel-status-appointment" data-id="${a.id}">Cancelar</button>` : `<button type="button" class="small-button reopen-appointment" data-id="${a.id}">Reabrir</button>`}
+                <button type="button" class="small-button edit-appointment" data-id="${a.id}">Editar</button>
+                <button type="button" class="small-button delete-appointment" data-id="${a.id}">Excluir</button>
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
       <table>
         <thead><tr><th>Cliente</th><th>Barbeiro</th><th>Serviço</th><th>Data</th><th>Hora</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>${state.appointments.map(a => `<tr><td>${escapeHtml(a.clientName)}</td><td>${escapeHtml(a.barberName)}</td><td>${escapeHtml(a.serviceName)}</td><td>${escapeHtml(a.date)}</td><td>${escapeHtml(a.time)}</td><td><span class="status ${safeAttr(a.status)}">${escapeHtml(formatStatus(a.status))}</span></td><td><button type="button" class="small-button edit-appointment" data-id="${a.id}">Editar</button><button type="button" class="small-button delete-appointment" data-id="${a.id}">Excluir</button></td></tr>`).join('')}</tbody>
@@ -541,6 +658,27 @@ const renderAppointments = (container) => {
     }
 
     await refresh();
+  });
+
+  document.querySelectorAll('.complete-appointment').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const appointment = state.appointments.find((item) => item.id === Number(button.dataset.id));
+      if (appointment) await updateAppointmentStatus(appointment, 'Concluido');
+    });
+  });
+
+  document.querySelectorAll('.cancel-status-appointment').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const appointment = state.appointments.find((item) => item.id === Number(button.dataset.id));
+      if (appointment) await updateAppointmentStatus(appointment, 'Cancelado');
+    });
+  });
+
+  document.querySelectorAll('.reopen-appointment').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const appointment = state.appointments.find((item) => item.id === Number(button.dataset.id));
+      if (appointment) await updateAppointmentStatus(appointment, 'Agendado');
+    });
   });
 
   document.querySelectorAll('.edit-appointment').forEach((button) => {

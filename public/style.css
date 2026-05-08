@@ -588,6 +588,130 @@ tbody tr:hover {
   font-weight: 900;
 }
 
+.metric-card span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.card-heading h3 {
+  margin: 0;
+}
+
+.card-heading span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.appointment-list,
+.agenda-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.appointment-item,
+.agenda-card {
+  border: 1px solid rgba(21, 24, 23, 0.1);
+  border-radius: 8px;
+  background: #fffdf7;
+  padding: 13px 14px;
+}
+
+.appointment-item strong,
+.appointment-item span,
+.appointment-item em,
+.agenda-card strong,
+.agenda-card span,
+.agenda-card small {
+  display: block;
+}
+
+.appointment-item strong,
+.agenda-card strong {
+  color: var(--green);
+}
+
+.appointment-item span,
+.agenda-card span,
+.agenda-card small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.appointment-item em {
+  margin-top: 9px;
+  font-style: normal;
+}
+
+.empty-state {
+  margin: 0;
+  border: 1px dashed rgba(21, 24, 23, 0.18);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 18px;
+}
+
+.status-overview {
+  box-shadow: none;
+}
+
+.agenda-wrapper {
+  overflow: visible;
+}
+
+.agenda-wrapper table {
+  display: none;
+}
+
+.agenda-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  align-items: start;
+}
+
+.agenda-card .table-actions {
+  grid-column: 1 / -1;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.table-actions .small-button {
+  min-height: 36px;
+}
+
+a.small-button {
+  text-decoration: none;
+}
+
+.whatsapp-action {
+  border-color: rgba(19, 110, 73, 0.26);
+  background: #e5f5ec;
+  color: #136e49;
+}
+
 .status-row {
   display: flex;
   align-items: center;
@@ -979,6 +1103,7 @@ button.service-card:hover {
   }
 
   .dashboard-grid,
+  .dashboard-panels,
   .booking-layout,
   .login-shell {
     grid-template-columns: 1fr;
@@ -1095,6 +1220,10 @@ button.service-card:hover {
 
   .service-card {
     min-height: 132px;
+  }
+
+  .agenda-card {
+    grid-template-columns: 1fr;
   }
 
   .modal {

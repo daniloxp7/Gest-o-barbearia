@@ -585,7 +585,7 @@ app.get('/api/appointments', async (req, res) => {
     const appointments = await queryAll(`
       SELECT a.id, a.date, a.time, a.status, a.notes,
         a.clientId, a.barberId, a.serviceId,
-        c.name AS clientName, b.name AS barberName, s.name AS serviceName,
+        c.name AS clientName, c.phone AS clientPhone, b.name AS barberName, s.name AS serviceName,
         s.price AS servicePrice
       FROM appointments a
       JOIN clients c ON c.id = a.clientId
